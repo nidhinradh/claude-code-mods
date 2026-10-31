@@ -231,3 +231,12 @@ test('a connected app that only reads asks nothing', async ($, on) => {
   expect(counts.asked).toBe(0)
   expect(counts.ran).toBe(1)
 })
+
+test('/send-guard never repeats the word in its reply', async ($, on) => {
+  engine(on, NO)
+  on('store.set', () => ({ value: undefined }))
+
+  const answer = await $.command.run({ command: 'send-guard', args: 'add Project Falcon' })
+
+  expect(answer.text).toBe('Added to your private list.')
+})

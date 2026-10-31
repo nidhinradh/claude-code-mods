@@ -223,6 +223,8 @@ async function allowsTool($: EngineInterface, question: string) {
   }
 }
 
+const HIDDEN_ARGS = '(hidden)'
+
 export const register: Register = on => {
   // A message the user chose to resend after the question couldn't be shown.
   let allowedText: string | null = null
@@ -237,8 +239,18 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'send-guard' }, async ($, e) => {
-    const [action = 'list', ...rest] = e.args.trim().split(/\s+/)
+  // The command's line is kept in the conversation, where Claude can read it, so
+  // the words on the list are swapped out here, before it's recorded.
+  let realArgs = ''
+
+  on('command.run', { command: 'send-guard' }, ($, e, next) => {
+    realArgs = e.args
+
+    return next({ ...e, args: HIDDEN_ARGS })
+  })
+
+  on('command.run', { command: 'send-guard', args: HIDDEN_ARGS }, async ($, e) => {
+    const [action = 'list', ...rest] = realArgs.trim().split(/\s+/)
     const word = rest.join(' ')
     const words = await wordsOf($)
 
