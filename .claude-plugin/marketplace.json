@@ -1,0 +1,11 @@
+{
+  "name": "claude-code-mods",
+  "owner": { "name": "nidhin.explains" },
+  "plugins": [
+    { "name": "token-meter", "source": "./token-meter", "description": "A live card above the prompt showing context, cost and plan limits" },
+    { "name": "risky-guard", "source": "./risky-guard", "description": "Asks before risky shell commands like rm -rf and force pushes" },
+    { "name": "email-hider", "source": "./email-hider", "description": "Hides email addresses in replies until you hover" },
+    { "name": "model-switcher", "source": "./model-switcher", "description": "Picks Haiku, Sonnet or Opus for a task, and holds it once a chat is long" },
+    { "name": "send-guard", "source": "./send-guard", "description": "Asks before common private details are sent to Claude, read by it, saved or sent out" }
+  ]
+}

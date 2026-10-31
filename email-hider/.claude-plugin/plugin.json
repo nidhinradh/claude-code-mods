@@ -1,0 +1,5 @@
+{
+  "name": "email-hider",
+  "version": "0.1.0",
+  "description": "Hides email addresses in Claude's replies until you hover"
+}

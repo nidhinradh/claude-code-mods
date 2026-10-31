@@ -1,0 +1,6 @@
+{
+  "name": "token-meter",
+  "version": "0.1.0",
+  "description": "Shows a live context meter above the prompt",
+  "types": "./types/index.d.ts"
+}

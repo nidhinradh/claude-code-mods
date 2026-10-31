@@ -1,0 +1,5 @@
+{
+  "name": "risky-guard",
+  "version": "0.1.0",
+  "description": "Holds risky shell commands and asks you first"
+}
