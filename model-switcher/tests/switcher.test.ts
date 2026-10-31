@@ -63,6 +63,7 @@ test('a long chat holds the model it already chose', async ($, on) => {
   on('model.classify', () => ({ value: 'complex' }))
 
   await $.prompt.submit({ text: HARD })
+  await step($)
   tokens = 90_000
   await $.prompt.submit({ text: 'thanks' })
   await step($)
@@ -103,5 +104,29 @@ test('/auto-model off leaves the session model alone', async ($, on) => {
   await $.prompt.submit({ text: HARD })
   await step($)
 
+  expect(seen.model).toBe('session-model')
+})
+
+test('a message another mod stops is never classified', async ($, on) => {
+  let classified = 0
+  on('session.usage', () => usage(0))
+  on('ui.status', () => ({ value: undefined }))
+  on('model.classify', () => {
+    classified += 1
+
+    return { value: 'complex' }
+  })
+  on('prompt.submit', () => ({ drop: 'stopped by a guard' }))
+  const seen = { model: '' }
+  on('turn.step', async function* (_: unknown, e: any) {
+    seen.model = e.model
+
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] }
+  })
+
+  await $.prompt.submit({ text: 'my password is abc123' })
+  await step($)
+
+  expect(classified).toBe(0)
   expect(seen.model).toBe('session-model')
 })

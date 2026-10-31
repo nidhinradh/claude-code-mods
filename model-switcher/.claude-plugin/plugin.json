@@ -1,6 +1,6 @@
 {
   "name": "model-switcher",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Picks Haiku, Sonnet or Opus for a task, and holds it once the chat is long",
   "types": "./types/index.d.ts"
 }

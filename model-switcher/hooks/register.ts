@@ -32,6 +32,29 @@ async function tierOf($: EngineInterface, text: string) {
   )
 }
 
+async function choose($: EngineInterface, text: string) {
+  const { context } = await $.session.usage()
+  const current = await read($, chosen)
+
+  if ((context.tokens ?? 0) > HOLD_ABOVE_TOKENS) {
+    $.ui.status(current === null ? 'auto model: holding session model' : `auto model: ${current} (held)`)
+
+    return
+  }
+
+  try {
+    const tier = await tierOf($, text)
+    const model = tier === undefined ? undefined : MODEL_FOR[tier]
+
+    if (model !== undefined) {
+      await update($, chosen, () => model)
+      $.ui.status(`auto model: ${model}`)
+    }
+  } catch {
+    // The classifier failed, so this turn keeps the model it already had.
+  }
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -52,36 +75,34 @@ export const register: Register = on => {
     return { text: off ? 'Automatic model switching is off.' : 'Automatic model switching is on.' }
   })
 
+  // Only remembered here. Other mods, like a guard, may still stop this message,
+  // and classifying it now would send it to a model before they've had their say.
+  let pendingText: string | null = null
+
   on('prompt.submit', async ($, e, next) => {
-    if (e.command !== undefined || e.isMeta === true || (await read($, isOff))) {
-      return next(e)
+    if (e.command === undefined && e.isMeta !== true) {
+      pendingText = e.text
     }
 
-    const { context } = await $.session.usage()
-    const current = await read($, chosen)
+    const entered = await next(e)
 
-    if ((context.tokens ?? 0) > HOLD_ABOVE_TOKENS) {
-      $.ui.status(current === null ? 'auto model: holding session model' : `auto model: ${current} (held)`)
-
-      return next(e)
+    if (entered.drop !== undefined) {
+      pendingText = null
     }
 
-    try {
-      const tier = await tierOf($, e.text)
-      const model = tier === undefined ? undefined : MODEL_FOR[tier]
-
-      if (model !== undefined) {
-        await update($, chosen, () => model)
-        $.ui.status(`auto model: ${model}`)
-      }
-    } catch {
-      // The classifier failed, so this turn keeps the model it already had.
-    }
-
-    return next(e)
+    return entered
   })
 
   on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined && pendingText !== null) {
+      const text = pendingText
+      pendingText = null
+
+      if (!(await read($, isOff))) {
+        await choose($, text)
+      }
+    }
+
     const model = e.agentId === undefined ? await read($, chosen) : null
 
     return yield* next(model === null ? e : { ...e, model })
