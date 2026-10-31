@@ -215,9 +215,9 @@ async function findInToolOutput($: EngineInterface, text: string) {
 }
 
 // Only an explicit yes lets it through. A dismissed question counts as no.
-async function allowsTool($: EngineInterface, question: string) {
+async function allowsTool($: EngineInterface, question: string, no = "Don't show Claude", yes = 'Show Claude') {
   try {
-    return (await $.ui.ask(question, ["Don't show Claude", 'Show Claude'])) === 'Show Claude'
+    return (await $.ui.ask(question, [no, yes])) === yes
   } catch {
     return false
   }
@@ -298,7 +298,7 @@ export const register: Register = on => {
   }).catch(() => ({ deny: 'The send guard failed, so this result was kept from Claude.' }))
 
   on('prompt.mention', async ($, e, next) => {
-    if (!SECRET_FILE.test(e.path) || (await allowsTool($, `Your message attaches ${e.mention}, which usually holds secrets. Show it to Claude?`))) {
+    if (!SECRET_FILE.test(e.path) || (await allowsTool($, `Your message attaches ${e.mention}, which usually holds secrets. Show it to Claude?`, "Don't attach", 'Attach it'))) {
       return next(e)
     }
 
@@ -311,7 +311,7 @@ export const register: Register = on => {
     const found = await findInToolOutput($, written)
     const path = e.tool === 'NotebookEdit' ? e.notebook_path : e.file_path
 
-    if (found.length === 0 || (await allowsTool($, `Claude is about to save ${found.join(', ')} into ${path}. Allow it?`))) {
+    if (found.length === 0 || (await allowsTool($, `Claude is about to save ${found.join(', ')} into ${path}. Allow it?`, "Don't save", 'Save it'))) {
       return next(e)
     }
 
@@ -333,7 +333,7 @@ export const register: Register = on => {
       .join('\n')
     const found = await findInToolOutput($, added)
 
-    if (found.length === 0 || (await allowsTool($, `This git command would include ${found.join(', ')}. Run it?`))) {
+    if (found.length === 0 || (await allowsTool($, `This git command would include ${found.join(', ')}. Run it?`, 'Cancel', 'Run it'))) {
       return next(e)
     }
 
@@ -342,7 +342,7 @@ export const register: Register = on => {
 
   // Data leaving this computer. Asks every time, as it can't tell what matters.
   on('tool.call', { tool: 'Bash', command: /\b(?:curl|wget|xh)\b[^|;&]*(?:\s-d\b|\s--data|\s-F\b|\s--form|\s-T\b|\s--upload-file|\s-X\s*(?:POST|PUT|PATCH)|\s--request\s+(?:POST|PUT|PATCH)|\s--post-)|\b(?:scp|sftp|ncat|nc)\s|\bgh\s+gist\s+create\b/ }, async ($, e, next) => {
-    if (/\b(?:localhost|127\.0\.0\.1)\b/.test(e.command) || (await allowsTool($, `This command sends data off your computer:\n\n${e.command.slice(0, 300)}\n\nRun it?`))) {
+    if (/\b(?:localhost|127\.0\.0\.1)\b/.test(e.command) || (await allowsTool($, `This command sends data off your computer:\n\n${e.command.slice(0, 300)}\n\nRun it?`, 'Cancel', 'Send it'))) {
       return next(e)
     }
 
@@ -350,7 +350,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'The send guard failed, so this command did not run.' }))
 
   on('tool.call', { tool: /^mcp__.*(?:send|post|message|reply|publish|upload|share|email|comment)/i }, async ($, e, next) => {
-    if (await allowsTool($, `${String(e.tool)} sends data to another service. Allow it?`)) {
+    if (await allowsTool($, `${String(e.tool)} sends data to another service. Allow it?`, 'Cancel', 'Send it')) {
       return next(e)
     }
 

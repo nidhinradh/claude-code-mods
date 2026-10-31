@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 // Stands for the engine, as in the other test files.
 function engine(on: any, label: string, diff = '') {
-  const counts = { asked: 0, ran: 0, question: '', toasts: 0 }
+  const counts = { asked: 0, ran: 0, question: '', options: '', toasts: 0 }
 
   on('store.get', () => ({ value: [] }))
   on('ui.toast', () => {
@@ -21,6 +21,7 @@ function engine(on: any, label: string, diff = '') {
     if (e.tool === 'AskUserQuestion') {
       counts.asked += 1
       counts.question = e.questions[0].question
+      counts.options = e.questions[0].options.map((option: any) => option.label).join(', ')
 
       return { result: { questions: e.questions, answers: { [e.questions[0].question]: label } } }
     }
@@ -239,4 +240,47 @@ test('/send-guard never repeats the word in its reply', async ($, on) => {
   const answer = await $.command.run({ command: 'send-guard', args: 'add Project Falcon' })
 
   expect(answer.text).toBe('Added to your private list.')
+})
+
+const LABELS: readonly (readonly [any, string])[] = [
+  [{ tool: 'Write', file_path: '/app/a.ts', content: FAKE_LINE }, "Don't save, Save it"],
+  [{ tool: 'Bash', command: 'scp a.txt server:/tmp' }, 'Cancel, Send it'],
+  [{ tool: 'mcp__slack__send_message', text: 'hello' }, 'Cancel, Send it'],
+  [{ tool: 'Read', file_path: '/app/.env' }, "Don't show Claude, Show Claude"],
+]
+
+for (const [call, labels] of LABELS) {
+  test(`${call.tool} offers: ${labels}`, async ($, on) => {
+    const counts = engine(on, NO)
+
+    await $.tool.call(call)
+
+    expect(counts.options).toBe(labels)
+    expect(counts.ran).toBe(0)
+  })
+}
+
+test('choosing the yes label lets an upload run', async ($, on) => {
+  const counts = engine(on, 'Send it')
+
+  await $.tool.call({ tool: 'Bash', command: 'scp a.txt server:/tmp' })
+
+  expect(counts.ran).toBe(1)
+})
+
+test('choosing the yes label lets a save run', async ($, on) => {
+  const counts = engine(on, 'Save it')
+
+  await $.tool.call({ tool: 'Write', file_path: '/app/a.ts', content: FAKE_LINE })
+
+  expect(counts.ran).toBe(1)
+})
+
+test('a git command with a secret offers Cancel and Run it', async ($, on) => {
+  const counts = engine(on, NO, `+${FAKE_LINE}\n`)
+
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "x"' })
+
+  expect(counts.options).toBe('Cancel, Run it')
+  expect(counts.ran).toBe(0)
 })
